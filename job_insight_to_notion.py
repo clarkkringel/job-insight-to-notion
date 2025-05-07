@@ -2,6 +2,7 @@ import os
 import openai
 from notion_client import Client
 from dotenv import load_dotenv
+from openai import OpenAI
 
 # Load environment variables
 load_dotenv()
@@ -10,7 +11,8 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 NOTION_API_KEY = os.getenv("NOTION_API_KEY")
 NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
 
-openai.api_key = OPENAI_API_KEY
+# Initialize the OpenAI client
+client = OpenAI(api_key=OPENAI_API_KEY)
 notion = Client(auth=NOTION_API_KEY)
 
 # User's background for prompt injection
@@ -36,21 +38,20 @@ Now, given the job posting below, evaluate Clark's alignment with the role. Iden
 2. Skills or knowledge areas he should strengthen  
 3. Bonus or stretch skills for long-term growth  
 
-Respond using this format:
+IMPORTANT: Your response MUST be under 2000 characters total. Be concise but specific. Focus on the most relevant points only.
+
+Format your response exactly like this (keep each section brief):
 
 ### 🔍 Skill Insight Summary – [Company Name] [Job Title]
 
 **Strong Fit:**  
-- [Skill/experience 1]  
-...
+- [2-3 most relevant skills/experiences]  
 
 **Skills to Strengthen:**  
-- **[Skill Area 1]:** [Action to build this skill]  
-...
+- [2-3 most important areas to improve]  
 
 **Bonus Areas (Stretch Goals):**  
-- [Bonus skill or experience 1]  
-...
+- [1-2 key stretch goals]  
 
 Here is the job posting:
 
@@ -60,7 +61,7 @@ Here is the job posting:
 # Call OpenAI to generate skill insight summary
 def get_skill_insight(job_description):
     prompt = generate_prompt(job_description)
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
@@ -68,7 +69,7 @@ def get_skill_insight(job_description):
         ],
         temperature=0.4
     )
-    return response['choices'][0]['message']['content']
+    return response.choices[0].message.content
 
 # Add new page to Notion database
 def send_to_notion(company, job_title, job_link, skill_summary):
@@ -78,8 +79,8 @@ def send_to_notion(company, job_title, job_link, skill_summary):
             "Company": {"title": [{"text": {"content": company}}]},
             "Job Title": {"rich_text": [{"text": {"content": job_title}}]},
             "Link to Posting": {"url": job_link},
-            "Status": {"select": {"name": "Wishlist"}},
-            "Fit Summary": {"multi_select": [{"name": "Needs Learning"}]},
+            "Status": {"select": {"name": "Wishlist"}},  # Always set to Wishlist
+            "Fit Summary": {"multi_select": [{"name": "Needs Learning"}]}  # Can be improved with parsing logic
         },
         children=[
             {
@@ -94,10 +95,10 @@ def send_to_notion(company, job_title, job_link, skill_summary):
 
 # Example usage
 if __name__ == "__main__":
-    job_description = open("vercel_job_posting.txt").read()  # or paste into variable directly
+    job_description = open("vercel_job_posting.txt").read()  # Load job post
     company = "Vercel"
     job_title = "Customer Support Engineer"
-    job_link = "https://vercel.com/careers/customer-support-engineer"  # placeholder
+    job_link = "https://vercel.com/careers/customer-support-engineer"  # Placeholder
 
     print("\nGenerating skill insight summary...")
     skill_summary = get_skill_insight(job_description)
@@ -106,3 +107,4 @@ if __name__ == "__main__":
     print("\nSending to Notion...")
     send_to_notion(company, job_title, job_link, skill_summary)
     print("Done.")
+
