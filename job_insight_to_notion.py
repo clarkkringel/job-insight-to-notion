@@ -1,18 +1,17 @@
 import os
-import openai
+import anthropic
 from notion_client import Client
 from dotenv import load_dotenv
-from openai import OpenAI
 
 # Load environment variables
 load_dotenv()
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 NOTION_API_KEY = os.getenv("NOTION_API_KEY")
 NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
 
-# Initialize the OpenAI client
-client = OpenAI(api_key=OPENAI_API_KEY)
+# Initialize the Anthropic client
+client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 notion = Client(auth=NOTION_API_KEY)
 
 # User's background for prompt injection
@@ -20,12 +19,12 @@ user_background = """
 Clark is a Senior Endpoint Support Analyst at UCLA with over 3 years of experience in IT support and automation projects. 
 He has worked at UCLA and TikTok, where he led initiatives like automated MacBook imaging with C++ and Arduino, migrated 
 knowledge bases to cloud platforms, and designed internal onboarding tools. He is certified in Azure (AZ-900), has hands-on 
-experience with REST APIs, Python, Flask, and OpenAI integrations, and is currently building AI-powered internal tooling. 
+experience with REST APIs, Python, Flask, and Anthropic/Claude integrations, and is currently building AI-powered internal tooling. 
 He has some experience in C++, JavaScript, and HTML, and is actively learning React, Next.js, CI/CD, and web architecture 
 fundamentals to transition into a Cloud or AI Solutions Engineering role.
 """
 
-# Template for OpenAI prompt
+# Template for Anthropic prompt
 def generate_prompt(job_description):
     return f"""
 You are a technical career coach. The user analyzing this job posting is Clark Kringel. Here is his professional background:
@@ -58,18 +57,16 @@ Here is the job posting:
 {job_description}
 """
 
-# Call OpenAI to generate skill insight summary
+# Call Anthropic to generate skill insight summary
 def get_skill_insight(job_description):
     prompt = generate_prompt(job_description)
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.4
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        system="You are a helpful assistant.",
+        messages=[{"role": "user", "content": prompt}]
     )
-    return response.choices[0].message.content
+    return response.content[0].text
 
 # Add new page to Notion database
 def send_to_notion(company, job_title, job_link, skill_summary):
@@ -87,7 +84,7 @@ def send_to_notion(company, job_title, job_link, skill_summary):
                 "object": "block",
                 "type": "paragraph",
                 "paragraph": {
-                    "rich_text": [{"type": "text", "text": {"content": skill_summary}}]
+                    "rich_text": [{"type": "text", "text": {"content": skill_summary[:1999]}}]
                 }
             }
         ]
