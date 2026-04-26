@@ -95,6 +95,43 @@ def get_skill_insight(job_description):
 def parse_response(raw):
     return json.loads(raw.strip())
 
+def is_duplicate_url(url):
+    r = requests.post(
+        f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query",
+        headers={
+            "Authorization": f"Bearer {NOTION_API_KEY}",
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json",
+        },
+        json={"filter": {"property": "Link to Posting", "url": {"equals": url}}}
+    )
+    r.raise_for_status()
+    return len(r.json().get("results", [])) > 0
+
+def is_duplicate_job(company, job_title):
+    r = requests.post(
+        f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query",
+        headers={
+            "Authorization": f"Bearer {NOTION_API_KEY}",
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json",
+        },
+        json={
+            "filter": {
+                "and": [
+                    {"property": "Company",   "title":     {"equals": company}},
+                    {"property": "Job Title", "rich_text": {"equals": job_title}},
+                ]
+            }
+        }
+    )
+    r.raise_for_status()
+    return len(r.json().get("results", [])) > 0
+
+def load_targets(path="targets.txt"):
+    with open(path) as f:
+        return [line.strip() for line in f if line.strip() and not line.startswith("#")]
+
 def send_to_notion(data, job_link):
     children = [
         {
@@ -166,28 +203,42 @@ def send_to_notion(data, job_link):
     )
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python3 job_insight_to_notion.py <job_posting_url>")
-        sys.exit(1)
-
-    url = sys.argv[1]
-
-    print("\nUpdating Notion schema...")
     migrate_notion_schema()
 
-    print("Fetching job posting...")
-    job_description = fetch_job_posting(url)
+    if len(sys.argv) >= 2:
+        urls = [sys.argv[1]]
+    else:
+        urls = load_targets()
+        print(f"Loaded {len(urls)} URL(s) from targets.txt\n")
 
-    print("Generating skill insight summary...")
-    raw_response = get_skill_insight(job_description)
+    added, skipped = 0, 0
 
-    data = parse_response(raw_response)
-    print(f"\nCompany:      {data['company']}")
-    print(f"Job Title:    {data['job_title']}")
-    print(f"Fit Score:    {data['fit_score']}/10")
-    print(f"Salary Range: {data['salary_range']}")
-    print(f"\nSummary: {data['summary']}")
+    for url in urls:
+        print(f"[ ] {url}")
 
-    print("\nSending to Notion...")
-    send_to_notion(data, url)
-    print("Done.")
+        if is_duplicate_url(url):
+            print(f"    Skipped — URL already in Notion\n")
+            skipped += 1
+            continue
+
+        print(f"    Fetching job posting...")
+        job_description = fetch_job_posting(url)
+
+        print(f"    Calling Claude...")
+        raw_response = get_skill_insight(job_description)
+        data = parse_response(raw_response)
+
+        if is_duplicate_job(data["company"], data["job_title"]):
+            print(f"    Skipped — {data['company']} / {data['job_title']} already in Notion\n")
+            skipped += 1
+            continue
+
+        print(f"    Company:   {data['company']}")
+        print(f"    Job Title: {data['job_title']}")
+        print(f"    Fit Score: {data['fit_score']}/10")
+        print(f"    Salary:    {data['salary_range']}")
+        send_to_notion(data, url)
+        print(f"    Added.\n")
+        added += 1
+
+    print(f"=== Summary: {added} added, {skipped} skipped ===")

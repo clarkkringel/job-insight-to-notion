@@ -1,0 +1,2 @@
+# Add one job URL per line. Blank lines and lines starting with # are ignored.
+https://plaid.com/careers/openings/product-support/united-states/technical-support-engineer/
