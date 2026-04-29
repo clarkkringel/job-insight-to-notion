@@ -1,2 +1,17 @@
 # Add one job URL per line. Blank lines and lines starting with # are ignored.
 https://plaid.com/careers/openings/product-support/united-states/technical-support-engineer/
+https://job-boards.greenhouse.io/tanium/jobs/7228001?gh_src=f0ee6cde1us
+https://job-boards.greenhouse.io/gleanwork/jobs/4520716005
+https://job-boards.greenhouse.io/attentive/jobs/4214773009?gh_src=63pk6gu69us
+https://apply.careers.microsoft.com/careers/job/1970393556859102?utm_source=linkedin&domain=microsoft.com&src=LinkedIn
+https://www.amazon.jobs/en/jobs/10397115/support-engineer-amazon-leo?cmpid=SPLICX0248M&utm_source=linkedin.com&utm_campaign=cxro&utm_medium=social_media&utm_content=job_posting&ss=paid
+https://www.linkedin.com/jobs/view/4392135293/
+https://www.easyllama.com/jobs?ashby_jid=41c686b1-9d63-4a14-92b5-e7428933d35e&utm_source=RKDQgBVEqj
+https://job-boards.greenhouse.io/anthropic/jobs/4802076008?gh_src=LinkedIn
+https://job-boards.greenhouse.io/hightouch/jobs/5699984004
+https://jobs.ashbyhq.com/pareto-ai/d1950c15-7f0f-4e2e-aeb4-cdc36f0065cf?utm_source=LinkedInPaid
+https://jobs.ashbyhq.com/n8n/38d5cc73-7799-47ca-9507-c601476f2c4b?utm_source=kvb7ldmbNl
+https://jobs.ashbyhq.com/stainlessapi/b8bd38de-ff27-49a5-a251-73cc838eb810?utm_source=5BxzzeG4L1
+https://jobs.ashbyhq.com/openai/49ae54dc-3d33-4107-8112-63fac1ee86ca?utm_source=8lvZy0eqYJ
+https://jobs.ashbyhq.com/gamma/f52fd4d1-f051-4438-a76b-cd0b35db2f0c?source=LinkedIn
+https://recruit.hirebridge.com/v3/Jobs/JobDetails.aspx?cid=6875&jid=608866&locvalue=1170

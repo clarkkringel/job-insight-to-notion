@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import time
 import anthropic
 import requests
 from bs4 import BeautifulSoup
@@ -53,13 +54,27 @@ def fetch_job_posting(url):
     try:
         response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
         response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        for tag in soup(["script", "style", "nav", "footer", "header"]):
+            tag.decompose()
+        text = soup.get_text(separator="\n", strip=True)
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching URL: {e}")
-        sys.exit(1)
-    soup = BeautifulSoup(response.text, "html.parser")
-    for tag in soup(["script", "style", "nav", "footer", "header"]):
-        tag.decompose()
-    return soup.get_text(separator="\n", strip=True)
+        text = ""
+        print(f"    Plain fetch failed ({e}), trying Jina...")
+
+    if len(text) < 200:
+        print(f"    Plain fetch returned {len(text)} chars, trying Jina...")
+        try:
+            r = requests.get(f"https://r.jina.ai/{url}", headers={"User-Agent": "Mozilla/5.0"}, timeout=60)
+            r.raise_for_status()
+            text = r.text.strip()
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Jina fallback failed: {e}")
+
+    if len(text) < 200:
+        raise RuntimeError(f"No useful content after plain fetch and Jina fallback ({len(text)} chars)")
+
+    return text[:8000]
 
 def generate_prompt(job_description):
     return f"""
@@ -73,7 +88,7 @@ Analyze the job posting below and return ONLY a valid JSON object with these exa
 - "fit_score": integer 1-10 (10 = perfect match)
 - "skills_to_learn": list of 2-4 strings (specific skills Clark is missing or should strengthen; each must be a short tag-style label, 1-4 words, no commas — e.g. "SQL", "Fintech Domain", "OAuth 2.0")
 - "next_steps": list of 2-3 strings (concrete action items Clark should take before applying)
-- "salary_range": string (extract from posting or estimate based on role/level, e.g. "$130k–$160k")
+- "salary_range": string (extract verbatim from the posting if stated; return "Not listed" if no salary or compensation range appears anywhere in the posting — do not estimate or infer)
 - "summary": string (2-3 sentences: overall fit, biggest gap, and one concrete reason to apply or skip)
 
 Return only the JSON object. No markdown fences, no explanation.
@@ -211,34 +226,39 @@ if __name__ == "__main__":
         urls = load_targets()
         print(f"Loaded {len(urls)} URL(s) from targets.txt\n")
 
-    added, skipped = 0, 0
+    added, skipped, failed = 0, 0, 0
 
     for url in urls:
         print(f"[ ] {url}")
+        try:
+            if is_duplicate_url(url):
+                print(f"    Skipped — URL already in Notion\n")
+                skipped += 1
+                continue
 
-        if is_duplicate_url(url):
-            print(f"    Skipped — URL already in Notion\n")
-            skipped += 1
-            continue
+            print(f"    Fetching job posting...")
+            job_description = fetch_job_posting(url)
 
-        print(f"    Fetching job posting...")
-        job_description = fetch_job_posting(url)
+            print(f"    Calling Claude...")
+            raw_response = get_skill_insight(job_description)
+            data = parse_response(raw_response)
+            time.sleep(10)
 
-        print(f"    Calling Claude...")
-        raw_response = get_skill_insight(job_description)
-        data = parse_response(raw_response)
+            if is_duplicate_job(data["company"], data["job_title"]):
+                print(f"    Skipped — {data['company']} / {data['job_title']} already in Notion\n")
+                skipped += 1
+                continue
 
-        if is_duplicate_job(data["company"], data["job_title"]):
-            print(f"    Skipped — {data['company']} / {data['job_title']} already in Notion\n")
-            skipped += 1
-            continue
+            print(f"    Company:   {data['company']}")
+            print(f"    Job Title: {data['job_title']}")
+            print(f"    Fit Score: {data['fit_score']}/10")
+            print(f"    Salary:    {data['salary_range']}")
+            send_to_notion(data, url)
+            print(f"    Added.\n")
+            added += 1
 
-        print(f"    Company:   {data['company']}")
-        print(f"    Job Title: {data['job_title']}")
-        print(f"    Fit Score: {data['fit_score']}/10")
-        print(f"    Salary:    {data['salary_range']}")
-        send_to_notion(data, url)
-        print(f"    Added.\n")
-        added += 1
+        except Exception as e:
+            print(f"    Error — {e}\n")
+            failed += 1
 
-    print(f"=== Summary: {added} added, {skipped} skipped ===")
+    print(f"=== Summary: {added} added, {skipped} skipped, {failed} failed ===")
